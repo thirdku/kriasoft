@@ -1,62 +1,120 @@
-/**
- * React Starter Kit (https://www.reactstarterkit.com/)
- *
- * Copyright © 2014-present Kriasoft, LLC. All rights reserved.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE.txt file in the root directory of this source tree.
- */
+import React, { Component } from 'react';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
-import React from 'react';
-import PropTypes from 'prop-types';
+// fake data generator
+ 
+// a little function to help us with reordering the result
+const reorder = (list, startIndex, endIndex) => {
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
 
-import StyleContext from 'isomorphic-style-loader/StyleContext';
-import ApplicationContext from './ApplicationContext';
-
-/**
- * The top-level React component setting context (global) variables
- * that can be accessed from all the child components.
- *
- * https://facebook.github.io/react/docs/context.html
- *
- * Usage example:
- *
- *   const context = {
- *     history: createBrowserHistory(),
- *     store: createStore(),
- *   };
- *
- *   ReactDOM.render(
- *     <App context={context} insertCss={() => {}}>
- *       <Layout>
- *         <LandingPage />
- *       </Layout>
- *     </App>,
- *     container,
- *   );
- */
-
-export default function App({ context, insertCss, children }) {
-  // NOTE: If you need to add or modify header, footer etc. of the app,
-  // please do that inside the Layout component.
-  return (
-    <StyleContext.Provider value={{ insertCss }}>
-      <ApplicationContext.Provider value={{ context }}>
-        {React.Children.only(children)}
-      </ApplicationContext.Provider>
-    </StyleContext.Provider>
-  );
-}
-
-App.propTypes = {
-  // Enables critical path CSS rendering
-  // https://github.com/kriasoft/isomorphic-style-loader
-  insertCss: PropTypes.func.isRequired,
-  context: PropTypes.shape({
-    // Universal HTTP client
-    fetch: PropTypes.func.isRequired,
-    pathname: PropTypes.string.isRequired,
-    query: PropTypes.object,
-  }).isRequired,
-  children: PropTypes.element.isRequired,
+  return result;
 };
+
+const grid = 8;
+
+const getItemStyle = (isDragging, draggableStyle) => ({
+  // some basic styles to make the items look a bit nicer
+  userSelect: 'none',
+  padding: grid * 2,
+  margin: `0 0 ${grid}px 0`,
+
+  // change background colour if dragging
+  background: isDragging ? 'lightgreen' : 'grey',
+
+  // styles we need to apply on draggables
+  ...draggableStyle,
+});
+
+const getListStyle = isDraggingOver => ({
+  background: isDraggingOver ? 'lightblue' : 'lightgrey',
+  padding: grid,
+  width: 250,
+});
+
+export default class App extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: [],
+      inputValue: '',
+    };
+    this.onDragEnd = this.onDragEnd.bind(this);
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+
+  onDragEnd(result) {
+    // dropped outside the list
+    if (!result.destination) {
+      return;
+    }
+
+    const items = reorder(
+      this.state.items,
+      result.source.index,
+      result.destination.index,
+    );
+
+    this.setState({
+      items: this.state.items,
+    });
+  }
+  handleChange = e => {
+    this.setState({
+      inputValue: e.target.value,
+    });
+  };
+  handleSubmit = e => {
+    e.preventDefault();
+    const newItem = this.state.inputValue;
+    this.setState({
+      items: [...this.state.items, newItem],
+      inputValue: '',
+    });
+  };
+
+  // Normally you would want to split things out into separate components.
+  // But in this example everything is just done in one place for simplicity
+  render() {
+    return (
+      <DragDropContext onDragEnd={this.onDragEnd}>
+        <h1> To Do List </h1>
+        <Droppable droppableId="droppable">
+          {(provided, snapshot) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              style={getListStyle(snapshot.isDraggingOver)}
+            >
+              {this.state.items.map((item, index) => (
+                <Draggable key={item.id} draggableId={item.id} index={index}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      style={getItemStyle(
+                        snapshot.isDragging,
+                        provided.draggableProps.style,
+                      )}
+                    >
+                      {item}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+        <form onSubmit={this.handleSubmit}>
+          <input onChange={this.handleChange} value={this.state.inputValue} />
+          <button type="submit">add</button>
+        </form>
+      </DragDropContext>
+    );
+  }
+}
